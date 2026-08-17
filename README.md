@@ -24,6 +24,7 @@ The central difficulty is imbalance: `Comment` is 64% of training replies
 
 ```
 notebooks/     the four experiments, committed with outputs
+docs/figures/  figures shown below, exported from the notebook outputs
 data/          dataset acquisition instructions and expected schema
                (the data itself is not redistributed)
 ```
@@ -102,14 +103,29 @@ The four classes separate on surface cues, but only partially. `Support`
 replies echo factual detail from the source (place names, event hashtags);
 `Deny` leans on explicit negation (`not`, "that's not", "not isis"); `Query` is
 dominated by interrogatives (`what`, `why`, "why did"); `Comment` is generic
-and conversational (`just`, `like`) plus event nouns. Contrasting token
-probabilities between stance-bearing and Comment replies shows stance replies
-skew towards event-specific entities and Comment replies towards social
-reaction (`people`, `hope`).
+and conversational (`just`, `like`) plus event nouns.
+
+![Top unigrams in replies by label](docs/figures/top-unigrams-by-label.png)
+
+Note that `not` tops the `Comment` column too, at 208 occurrences against
+`Deny`'s 65 — the cue is frequent in the majority class as well, which is
+precisely why keyword matching cannot carry `Deny`.
+
+Contrasting token probabilities between stance-bearing and Comment replies
+separates them more cleanly: stance replies skew towards event-specific
+entities (`sydney`, `hostages`, `#charliehebdo`), Comment replies towards
+social reaction (`just`, `people`, `hope`, `religion`).
+
+![Tokens more common in stance replies vs Comment replies](docs/figures/stance-vs-comment-tokens.png)
 
 LDA over the two groups was much weaker: eight topics fitted separately to
-stance and Comment replies gave near-identical mean topic proportions, so
-thematic content does not distinguish stance. Both analyses are bag-of-words
+stance and Comment replies gave near-identical mean topic proportions, and the
+topics themselves are organised by news event — the Sydney siege, Ottawa,
+Ferguson, Charlie Hebdo — rather than by stance.
+
+![LDA topic word clouds for stance-bearing replies](docs/figures/lda-wordclouds-stance.png)
+
+Thematic content therefore does not distinguish stance. Both analyses are bag-of-words
 and ignore discourse structure, so they are suggestive rather than conclusive —
 part of the case for using learned contextual representations instead.
 
@@ -162,8 +178,12 @@ before any model ran. `data/README.md` includes that check.
   concatenated, so the model can attend across the boundary.
 - **Training**: AdamW with weight decay, linear schedule with warm-up, gradient
   clipping, raised dropout and label smoothing against over-confidence, early
-  stopping on dev macro-F1 (best checkpoint at epoch 5). Loss falls steadily
-  and flattens after roughly 1000 steps.
+  stopping on dev macro-F1. Loss falls steadily and flattens after roughly 1000
+  steps; dev macro-F1 is essentially converged by epoch 2 and peaks at epoch 5,
+  so the remaining epochs buy almost nothing.
+
+  ![Training loss curve](docs/figures/training-loss.png)
+  ![Dev macro-F1 by epoch](docs/figures/dev-macro-f1-by-epoch.png)
 - **Prompting** uses ranked scoring over label tokens instead of free-form
   generation, which makes outputs deterministic and eliminates invalid or
   hallucinated labels by construction. Tokenisation uses left truncation and
