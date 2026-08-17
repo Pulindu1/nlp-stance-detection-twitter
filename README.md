@@ -139,13 +139,18 @@ before any model ran. `data/README.md` includes that check.
 ## Running
 
 ```bash
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 jupyter lab
 ```
 
-Obtain the dataset first — see `data/README.md`. Notebooks read
+Obtain the dataset first — see `data/README.md`, which also includes a
+validation snippet worth running before you train. Notebooks read
 `data/processed/` relative to the repository root, so launch Jupyter from
 there.
+
+Pinned versions in `requirements.txt` are those used to produce the committed
+outputs (Python 3.14).
 
 `01` and `03` run on CPU. `02` and `04` fine-tune BERTweet and want a CUDA
 device; they fall back to CPU but slowly. Experiments were run under a

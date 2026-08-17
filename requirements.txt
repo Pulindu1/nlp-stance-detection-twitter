@@ -1,11 +1,24 @@
-torch>=2.5
-transformers>=4.50
-pandas>=2.0
-numpy>=1.26
-scikit-learn>=1.4
-matplotlib>=3.8
-jupyterlab>=4.0
+# Versions used to produce the committed notebook outputs (Python 3.14.0).
+# The fine-tuning notebooks (02, 04) were additionally run on CUDA hardware;
+# install the torch build matching your platform from https://pytorch.org.
 
-# BERTweet's slow tokenizer (use_fast=False) requires these
-sentencepiece>=0.2
-emoji>=2.0
+torch==2.9.1
+transformers==4.57.3
+tokenizers==0.22.1
+accelerate==1.12.0
+datasets==4.4.2
+
+scikit-learn==1.8.0
+pandas==2.3.3
+numpy==2.4.0
+matplotlib==3.10.8
+
+# LDA topic analysis and word clouds in 01_data_analysis.ipynb
+wordcloud==1.9.5
+
+# BERTweet's tokenizer is loaded with use_fast=False to preserve emoji, and
+# pins this specific emoji release — newer versions change the API it calls.
+emoji==0.6.0
+
+jupyterlab>=4.0
+ipywidgets>=8.0
