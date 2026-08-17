@@ -1,9 +1,10 @@
 # macOS
 .DS_Store
 
-# Dataset — RumourEval 2017 is licence-restricted and must be obtained
-# from the organisers (see README). Processed CSVs are derived from it.
-data/
+# Dataset — RumourEval 2017 must be obtained from the organisers, see
+# data/README.md. Processed CSVs are derived from it and not redistributed.
+data/*
+!data/README.md
 
 # Training artefacts: checkpoints, logs, generated figures
 runs/
@@ -12,7 +13,7 @@ submissions/
 *.bin
 *.safetensors
 
-# Coursework specification (university material, not redistributable)
+# Assignment brief (not my work, not redistributable)
 spec.pdf
 
 # Python
