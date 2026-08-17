@@ -17,13 +17,13 @@ stance toward the claim:
 
 The central difficulty is imbalance: `Comment` is 64% of training replies
 (C=2291, S=743, D=273, Q=262), so accuracy is close to meaningless and
-**macro-F1** is the metric throughout.
+**macro-F1** is the metric throughout. The splits are small too — 3569 train,
+950 dev, 1049 test.
 
 ## Repository contents
 
 ```
 notebooks/     the four experiments, committed with outputs
-docs/          the written report
 data/          dataset acquisition instructions and expected schema
                (the data itself is not redistributed)
 ```
@@ -34,7 +34,6 @@ data/          dataset acquisition instructions and expected schema
 | `notebooks/02_direct_4way_bertweet.ipynb` | Direct 4-way fine-tuning of BERTweet with layer-wise LR decay, square-root inverse-frequency class weighting, label smoothing, and early stopping on dev macro-F1 |
 | `notebooks/03_prompting_flan_t5.ipynb` | FLAN-T5-large zero-shot and few-shot prompting, scored by ranked log-probability over label tokens `A/B/C/D`, plus a per-class logit calibration sweep |
 | `notebooks/04_two_stage_cascade.ipynb` | Two-stage cascade: binary Comment-vs-Non-Comment detection, then S/D/Q classification on routed examples, with the routing threshold τ tuned on dev |
-| `docs/report.pdf` | Full write-up, including the ethical analysis of the dataset and deployment risks |
 | `data/README.md` | How to obtain the dataset and the expected CSV schema |
 
 Notebooks are committed with their outputs, so every figure and number below is
@@ -57,9 +56,16 @@ it scores 0.65 accuracy while being useless, which is the trap this task sets.
 | FLAN-T5 zero-shot | 0.63 | 0.45 |
 | FLAN-T5 few-shot (k=1) | 0.62 | 0.41 |
 
-Stage-wise, the cascade's components were individually strong — 0.66 macro-F1
-for Comment detection, 0.64 for three-way S/D/Q — but those gains did not
+Stage-wise, the cascade's components were individually strong — 0.662 macro-F1
+for Comment detection, 0.636 for three-way S/D/Q — but those gains did not
 survive composition.
+
+Per-class dev F1 shows where the macro average comes from:
+
+| Approach | S | D | Q | C |
+|---|---|---|---|---|
+| Direct 4-way BERTweet | 0.53 | 0.25 | 0.59 | 0.77 |
+| FLAN-T5 zero-shot | 0.53 | 0.09 | 0.46 | 0.75 |
 
 ### What the comparison shows
 
@@ -90,12 +96,29 @@ negation markers like "not" characterise only the most overt denials.
 dev improved few-shot only marginally (0.414 → 0.417), so the residual error is
 not a simple recoverable class-prior shift.
 
+### What the lexical analysis shows
+
+The four classes separate on surface cues, but only partially. `Support`
+replies echo factual detail from the source (place names, event hashtags);
+`Deny` leans on explicit negation (`not`, "that's not", "not isis"); `Query` is
+dominated by interrogatives (`what`, `why`, "why did"); `Comment` is generic
+and conversational (`just`, `like`) plus event nouns. Contrasting token
+probabilities between stance-bearing and Comment replies shows stance replies
+skew towards event-specific entities and Comment replies towards social
+reaction (`people`, `hope`).
+
+LDA over the two groups was much weaker: eight topics fitted separately to
+stance and Comment replies gave near-identical mean topic proportions, so
+thematic content does not distinguish stance. Both analyses are bag-of-words
+and ignore discourse structure, so they are suggestive rather than conclusive —
+part of the case for using learned contextual representations instead.
+
 ## The test split is unusable
 
-The notebooks contain test-set numbers, and `docs/report.pdf` interprets them as a
-generalisation failure under distribution shift. **That interpretation is
-wrong, and the test numbers should be disregarded.** The split was exported
-with its text fields empty:
+The notebooks contain test-set numbers (macro-F1 0.23 direct, 0.21 prompting,
+0.21 cascade) and read them as a generalisation failure under distribution
+shift. **That reading is wrong, and the test numbers should be disregarded.**
+The split was exported with its text fields empty:
 
 ```
 test.csv  — 1049 rows, 4 columns
@@ -113,7 +136,7 @@ The tell is in `notebooks/04_two_stage_cascade.ipynb`, whose Stage 1 logs
 overfit classifier still produces *varying* probabilities on varying text;
 identical probabilities to sixteen significant figures can only mean identical
 input. The cascade consequently routed 0% of test examples, never invoked
-Stage 2, and scored exactly the all-`Comment` baseline — which the report
+Stage 2, and scored exactly the all-`Comment` baseline — which the notebook
 attributes to Stage 1 routing errors.
 
 Labels and `tweet_id`s survived the export, so the fix is to re-derive the text
@@ -137,9 +160,22 @@ before any model ran. `data/README.md` includes that check.
   extreme weight the `Deny` class would otherwise receive.
 - **Input format**: source and reply are fused as a sentence pair rather than
   concatenated, so the model can attend across the boundary.
+- **Training**: AdamW with weight decay, linear schedule with warm-up, gradient
+  clipping, raised dropout and label smoothing against over-confidence, early
+  stopping on dev macro-F1 (best checkpoint at epoch 5). Loss falls steadily
+  and flattens after roughly 1000 steps.
 - **Prompting** uses ranked scoring over label tokens instead of free-form
   generation, which makes outputs deterministic and eliminates invalid or
-  hallucinated labels by construction.
+  hallucinated labels by construction. Tokenisation uses left truncation and
+  long texts are clipped to a fixed character budget inside the prompt, which
+  costs some macro-F1 but keeps the source–reply pair intact. Few-shot
+  demonstrations are hand-picked for clear cues (question marks for `Query`,
+  explicit negation for `Deny`, agreement terms for `Support`).
+- **Cascade**: Stage 1 is a binary BERTweet classifier over `Comment` vs
+  `Non-Comment` trained on the full training set; an example is routed to
+  Stage 2 unless `p(Comment | x) ≥ τ`. Stage 2 is a separate BERTweet trained
+  only on S/D/Q, so it never spends capacity on the majority class. Routing is
+  hard, so Stage 1 errors are terminal.
 - **Reproducibility**: seeds fixed (`SEED = 42`); exact package versions in
   `requirements.txt`.
 
@@ -167,14 +203,24 @@ limited by design rather than by conclusion.
 
 ## Ethical considerations
 
-`docs/report.pdf` covers this in full. In summary: tweets are public but their
-authors did not consent to research reuse, so no user-level metadata or
-identity inference is used anywhere here and outputs are restricted to closed-set
-stance labels. Stance is **not** veracity — a reply's stance toward a claim says
-nothing about whether the claim is true, and treating these predictions as
-credibility signals would risk amplifying misinformation. At scale, stance
-classification is also open to misuse for viewpoint monitoring or suppression,
-which is why the limitations above are documented rather than smoothed over.
+**Consent and privacy.** Tweets are public but their authors did not consent to
+research reuse, and replies can carry names, locations, or speculative
+accusations. Tweets are treated purely as text here: no user-level metadata, no
+identity inference, and outputs restricted to closed-set stance labels. Any
+real deployment would need anonymisation and strict data minimisation on top.
+
+**Stance is not veracity.** A reply's stance toward a claim says nothing about
+whether the claim is true. Treating these predictions as credibility signals
+would risk amplifying misinformation in exactly the high-stakes settings where
+rumour analysis is tempting; fact-checking and human oversight remain separate
+requirements.
+
+**Bias and misuse.** `Comment` dominance biases every model towards the
+majority class, under-representing denial and questioning — which is why
+macro-F1 and per-class metrics are reported rather than accuracy. At scale,
+stance classification is open to misuse for viewpoint monitoring or
+suppression, particularly if misclassification falls unevenly on minority
+groups, so the limitations above are documented rather than smoothed over.
 
 ## Acknowledgements
 

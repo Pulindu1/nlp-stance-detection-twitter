@@ -22,3 +22,6 @@ __pycache__/
 venv/
 env/
 *.egg-info/
+
+# Written report (kept locally, not published)
+docs/report.pdf

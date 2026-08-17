@@ -39,7 +39,7 @@ text fields**. Labels and IDs survived; the text did not:
 | `dev.csv` | 950 | 22 | populated | populated |
 | `test.csv` | 1049 | 4 | **empty in all 1049 rows** | **empty in all 1049 rows** |
 
-Every test-set number in the notebooks and in `docs/report.pdf` therefore reflects
+Every test-set number in the notebooks therefore reflects
 classifying an empty string, not model generalisation. Dev results are
 unaffected. See "The test split is unusable" in the top-level README.
 
