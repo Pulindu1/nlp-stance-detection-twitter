@@ -21,13 +21,20 @@ The central difficulty is imbalance: `Comment` is 64% of training replies
 
 ## Repository contents
 
+```
+notebooks/     the four experiments, committed with outputs
+docs/          the written report
+data/          dataset acquisition instructions and expected schema
+               (the data itself is not redistributed)
+```
+
 | File | Contents |
 |---|---|
-| `01_data_analysis.ipynb` | Top unigrams/bigrams per stance class, source-vs-reply token distribution contrasts, and LDA topic models with word clouds fitted separately to stance-bearing and Comment replies |
-| `02_direct_4way_bertweet.ipynb` | Direct 4-way fine-tuning of BERTweet with layer-wise LR decay, square-root inverse-frequency class weighting, label smoothing, and early stopping on dev macro-F1 |
-| `03_prompting_flan_t5.ipynb` | FLAN-T5-large zero-shot and few-shot prompting, scored by ranked log-probability over label tokens `A/B/C/D`, plus a per-class logit calibration sweep |
-| `04_two_stage_cascade.ipynb` | Two-stage cascade: binary Comment-vs-Non-Comment detection, then S/D/Q classification on routed examples, with the routing threshold τ tuned on dev |
-| `report.pdf` | Full write-up, including the ethical analysis of the dataset and deployment risks |
+| `notebooks/01_data_analysis.ipynb` | Top unigrams/bigrams per stance class, source-vs-reply token distribution contrasts, and LDA topic models with word clouds fitted separately to stance-bearing and Comment replies |
+| `notebooks/02_direct_4way_bertweet.ipynb` | Direct 4-way fine-tuning of BERTweet with layer-wise LR decay, square-root inverse-frequency class weighting, label smoothing, and early stopping on dev macro-F1 |
+| `notebooks/03_prompting_flan_t5.ipynb` | FLAN-T5-large zero-shot and few-shot prompting, scored by ranked log-probability over label tokens `A/B/C/D`, plus a per-class logit calibration sweep |
+| `notebooks/04_two_stage_cascade.ipynb` | Two-stage cascade: binary Comment-vs-Non-Comment detection, then S/D/Q classification on routed examples, with the routing threshold τ tuned on dev |
+| `docs/report.pdf` | Full write-up, including the ethical analysis of the dataset and deployment risks |
 | `data/README.md` | How to obtain the dataset and the expected CSV schema |
 
 Notebooks are committed with their outputs, so every figure and number below is
@@ -85,7 +92,7 @@ not a simple recoverable class-prior shift.
 
 ## The test split is unusable
 
-The notebooks contain test-set numbers, and `report.pdf` interprets them as a
+The notebooks contain test-set numbers, and `docs/report.pdf` interprets them as a
 generalisation failure under distribution shift. **That interpretation is
 wrong, and the test numbers should be disregarded.** The split was exported
 with its text fields empty:
@@ -101,7 +108,7 @@ For comparison, `train.csv` and `dev.csv` have 22 columns with fully populated
 text. Every model was therefore asked to classify an empty string 1049 times,
 and the resulting scores describe the export bug rather than any model.
 
-The tell is in `04_two_stage_cascade.ipynb`, whose Stage 1 logs
+The tell is in `notebooks/04_two_stage_cascade.ipynb`, whose Stage 1 logs
 `p(noncomment)` as `min = mean = max = 0.3785` across all 1049 rows. A genuinely
 overfit classifier still produces *varying* probabilities on varying text;
 identical probabilities to sixteen significant figures can only mean identical
@@ -145,9 +152,10 @@ jupyter lab
 ```
 
 Obtain the dataset first — see `data/README.md`, which also includes a
-validation snippet worth running before you train. Notebooks read
-`data/processed/` relative to the repository root, so launch Jupyter from
-there.
+validation snippet worth running before you train. The notebooks resolve
+`data/processed/` and their `runs/` output directory against the repository
+root, so they work whether Jupyter is launched from the root or from
+`notebooks/`.
 
 Pinned versions in `requirements.txt` are those used to produce the committed
 outputs (Python 3.14).
@@ -159,7 +167,7 @@ limited by design rather than by conclusion.
 
 ## Ethical considerations
 
-`report.pdf` covers this in full. In summary: tweets are public but their
+`docs/report.pdf` covers this in full. In summary: tweets are public but their
 authors did not consent to research reuse, so no user-level metadata or
 identity inference is used anywhere here and outputs are restricted to closed-set
 stance labels. Stance is **not** veracity — a reply's stance toward a claim says
