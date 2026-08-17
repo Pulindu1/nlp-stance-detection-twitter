@@ -13,8 +13,6 @@ submissions/
 *.bin
 *.safetensors
 
-# Assignment brief (not my work, not redistributable)
-spec.pdf
 
 # Python
 __pycache__/

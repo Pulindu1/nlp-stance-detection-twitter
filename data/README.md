@@ -28,18 +28,53 @@ required are:
 
 Split sizes used in these experiments: train 3569, dev 950, test 1049.
 
-## Known inconsistency in the splits used
+## Known defect in the test split
 
-The CSVs behind the committed notebook outputs were **not uniform across
-splits**, and this is load-bearing for how the test results should be read:
+The `test.csv` behind the committed notebook outputs was exported **with empty
+text fields**. Labels and IDs survived; the text did not:
 
-- `train.csv` and `dev.csv` had 22 columns, including pre-normalised
-  `source_text_norm` / `reply_text_norm` variants and a range of derived
-  features.
-- `test.csv` had only 4 columns, with no `*_norm` variants.
+| Split | Rows | Columns | `source_text` | `reply_text` |
+|---|---|---|---|---|
+| `train.csv` | 3569 | 22 | populated | populated |
+| `dev.csv` | 950 | 22 | populated | populated |
+| `test.csv` | 1049 | 4 | **empty in all 1049 rows** | **empty in all 1049 rows** |
 
-`03_prompting_flan_t5.ipynb` resolves its input columns by preference order and
-logs what it picked:
+Every test-set number in the notebooks and in `report.pdf` therefore reflects
+classifying an empty string, not model generalisation. Dev results are
+unaffected. See "The test split is unusable" in the top-level README.
+
+Because `tweet_id` and `label` survived, the split can be repaired by
+re-deriving the text from the original SemEval distribution and joining on
+`tweet_id`, without needing to redo the annotation or the splits.
+
+## Validating before you train
+
+The defect above would have been caught before any model ran by asserting on
+the inputs at load time. Any regeneration of these CSVs should pass:
+
+```python
+import pandas as pd
+
+REQUIRED = ["tweet_id", "source_text", "reply_text", "label"]
+
+for split in ["train", "dev", "test"]:
+    df = pd.read_csv(f"data/processed/{split}.csv")
+
+    missing = [c for c in REQUIRED if c not in df.columns]
+    assert not missing, f"{split}: missing columns {missing}"
+
+    for col in ["source_text", "reply_text"]:
+        blank = df[col].isna() | (df[col].astype(str).str.strip() == "")
+        assert not blank.any(), f"{split}: {blank.sum()}/{len(df)} rows blank in {col}"
+
+    assert set(df["label"].unique()) <= {"S", "D", "Q", "C"}, f"{split}: unexpected labels"
+    print(f"{split}: {len(df)} rows OK")
+```
+
+All three splits should also expose the *same* columns. In the original CSVs
+they did not, and `03_prompting_flan_t5.ipynb` — which resolves column names by
+preference order — silently fed normalised text on train/dev but raw text on
+test:
 
 ```
 [train] src='source_text_norm' rpl='reply_text_norm' lbl='label'
@@ -47,7 +82,5 @@ logs what it picked:
 [test]  src='source_text'      rpl='reply_text'      lbl='label'
 ```
 
-So that notebook fed **normalised** text on train/dev and **raw** text on test.
-Any regeneration of these CSVs should produce identical columns for all three
-splits, which removes this asymmetry. See the "Reading the test results"
-section of the top-level README for why it matters.
+This is secondary to the empty-text defect, but is a second reason to make the
+splits schema-identical when regenerating them.

@@ -35,17 +35,20 @@ inspectable without rerunning anything.
 
 ## Results
 
-Macro-F1 is the headline metric. A majority-class predictor is included because
-it scores 0.65 accuracy on dev while being useless, which is the trap this task
-sets.
+All results below are on the **development set**. The test split shipped with
+empty text fields and is unusable — see
+[the test split](#the-test-split-is-unusable) for the diagnosis.
 
-| Approach | Dev accuracy | Dev macro-F1 | Test accuracy | Test macro-F1 |
-|---|---|---|---|---|
-| Majority class (all `Comment`) | 0.65 | 0.20 | 0.74 | 0.21 |
-| **Direct 4-way BERTweet** | 0.67 | **0.54** | 0.72 | 0.23 |
-| Two-stage cascade | 0.69 | 0.52 | 0.74 | 0.21 |
-| FLAN-T5 zero-shot | 0.63 | 0.45 | — | 0.21 |
-| FLAN-T5 few-shot (k=1) | 0.62 | 0.41 | — | 0.21 |
+Macro-F1 is the headline metric. A majority-class predictor is included because
+it scores 0.65 accuracy while being useless, which is the trap this task sets.
+
+| Approach | Dev accuracy | Dev macro-F1 |
+|---|---|---|
+| Majority class (all `Comment`) | 0.65 | 0.20 |
+| **Direct 4-way BERTweet** | 0.67 | **0.54** |
+| Two-stage cascade | 0.69 | 0.52 |
+| FLAN-T5 zero-shot | 0.63 | 0.45 |
+| FLAN-T5 few-shot (k=1) | 0.62 | 0.41 |
 
 Stage-wise, the cascade's components were individually strong — 0.66 macro-F1
 for Comment detection, 0.64 for three-way S/D/Q — but those gains did not
@@ -76,39 +79,45 @@ the lowest per-class F1 in every approach (as low as 0.09 for zero-shot
 prompting). The n-gram analysis shows why keyword-style cues struggle: explicit
 negation markers like "not" characterise only the most overt denials.
 
-**Calibration did not transfer.** Tuning per-class logit offsets on dev
-improved dev few-shot slightly (0.414 → 0.417) but changed test results not at
-all, indicating the dev→test gap is not a simple recoverable class-prior shift.
+**Calibration did not transfer usefully.** Tuning per-class logit offsets on
+dev improved few-shot only marginally (0.414 → 0.417), so the residual error is
+not a simple recoverable class-prior shift.
 
-## Reading the test results
+## The test split is unusable
 
-Every approach degrades sharply from dev to test, and three of the five land at
-exactly 0.2129 — the all-`Comment` score. `report.pdf` attributes this to
-majority-class overfitting under distribution shift. That reading is sound for
-the direct classifier, but while preparing this repository I found two
-artefacts that mean the test column above **understates** the models and should
-not be quoted as generalisation performance:
+The notebooks contain test-set numbers, and `report.pdf` interprets them as a
+generalisation failure under distribution shift. **That interpretation is
+wrong, and the test numbers should be disregarded.** The split was exported
+with its text fields empty:
 
-1. **Train/test preprocessing asymmetry.** `train.csv` and `dev.csv` carried 22
-   columns including pre-normalised `*_norm` text variants; `test.csv` carried
-   only 4 and had none. The prompting notebook resolves columns by preference
-   order, so it fed *normalised* text on train/dev and *raw* text on test — an
-   input mismatch that manifests as a distribution shift but is really a data
-   preparation bug. Details in `data/README.md`.
+```
+test.csv  — 1049 rows, 4 columns
+  label       : 4 distinct values, 0 empty     ← intact
+  source_text : 1 distinct value, 1049 empty   ← every row is ""
+  reply_text  : 1 distinct value, 1049 empty   ← every row is ""
+```
 
-2. **The cascade's Stage 1 received constant input on test.** Its logged
-   `p(noncomment)` has `min = mean = max = 0.3785` across all 1049 test rows.
-   A collapsed classifier still produces *varying* probabilities on varying
-   text; identical probabilities to sixteen significant figures indicate
-   identical input. Consequently 0% of test examples cleared the routing
-   threshold, Stage 2 was never invoked, and the reported test score is an
-   all-`Comment` fallback rather than the routing-error effect described in the
-   report.
+For comparison, `train.csv` and `dev.csv` have 22 columns with fully populated
+text. Every model was therefore asked to classify an empty string 1049 times,
+and the resulting scores describe the export bug rather than any model.
 
-The dev results are unaffected by both issues and are the sound basis for
-comparison. Diagnosing (1) and (2) — regenerating the splits with identical
-columns and re-running the cascade — is the outstanding work on this project.
-I have left the original numbers in place rather than quietly restating them.
+The tell is in `04_two_stage_cascade.ipynb`, whose Stage 1 logs
+`p(noncomment)` as `min = mean = max = 0.3785` across all 1049 rows. A genuinely
+overfit classifier still produces *varying* probabilities on varying text;
+identical probabilities to sixteen significant figures can only mean identical
+input. The cascade consequently routed 0% of test examples, never invoked
+Stage 2, and scored exactly the all-`Comment` baseline — which the report
+attributes to Stage 1 routing errors.
+
+Labels and `tweet_id`s survived the export, so the fix is to re-derive the text
+from the original SemEval distribution and re-run. Until then, dev is the only
+sound basis for comparison, which is why the results table above is dev-only.
+
+Two lessons worth stating plainly, since this is the most instructive part of
+the project: a metric that lands *exactly* on the majority-class baseline
+deserves suspicion rather than a narrative explaining it, and input data should
+be asserted on — a two-line non-empty check at load time would have caught this
+before any model ran. `data/README.md` includes that check.
 
 ## Method notes
 
