@@ -183,9 +183,6 @@ which is why the limitations above are documented rather than smoothed over.
 - Nguyen et al., *BERTweet: A pre-trained language model for English Tweets*
 - Chung et al., *Scaling Instruction-Finetuned Language Models* (FLAN-T5)
 
-Produced as individual university coursework in Natural Language Processing
-(2025–26). An LLM assistant was used for code debugging during development.
-
 ## Licence
 
 MIT — see `LICENSE`. The licence covers the code and analysis, not the
